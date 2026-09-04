@@ -45,4 +45,16 @@ describe("simulateFinancing", () => {
     expect(comparison.scenario.schedule[12].payment).toBeLessThan(comparison.scenario.schedule[10].payment);
     expect(comparison.scenario.payoffMonth).toBe(comparison.baseline.payoffMonth);
   });
+
+  it("recalcula a cota SAC sem reduzir o prazo quando o objetivo é reduzir parcela", () => {
+    const comparison = compareFinancing(
+      { principal: 100000, annualRate: 10, termMonths: 120, method: "sac" },
+      [{ month: 12, amount: 10000 }],
+      "payment",
+    );
+
+    expect(comparison.scenario.schedule[11].extraordinary).toBe(10000);
+    expect(comparison.scenario.schedule[12].payment).toBeLessThan(comparison.scenario.schedule[10].payment);
+    expect(comparison.scenario.payoffMonth).toBe(comparison.baseline.payoffMonth);
+  });
 });

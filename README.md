@@ -53,4 +53,4 @@ pnpm test
 pnpm build
 ```
 
-O banco usa SQLite nativo do Node 22. Senhas são armazenadas com salt e `scrypt`; o token bruto da sessão não é armazenado no banco. Registros de financiamentos existentes sem proprietário são associados à primeira conta criada após a migração.
+O banco usa SQLite nativo do Node 22. Senhas são armazenadas com salt e `scrypt`; o token bruto da sessão não é armazenado no banco. Em produção, a sessão usa cookie `Secure`. O login aceita até cinco falhas antes de bloquear novas tentativas por 15 minutos. Registros de financiamentos existentes sem proprietário são associados à primeira conta criada após a migração.

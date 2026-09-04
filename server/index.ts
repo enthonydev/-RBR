@@ -8,6 +8,9 @@ import { addAmortization, claimOrphanedFinancings, createFinancing, createSessio
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sessionCookie = "rbr_session";
+const loginAttempts = new Map<string, { failures: number; blockedUntil: number }>();
+const loginWindowMs = 15 * 60 * 1000;
+const maxLoginFailures = 5;
 
 function isMethod(value: unknown): value is AmortizationMethod {
   return value === "price" || value === "sac";
@@ -58,11 +61,33 @@ function requireUser(request: Request, response: Response, database: ReturnType<
 
 function setSession(response: Response, token: string, expiresAt: string) {
   const maxAge = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
-  response.setHeader("Set-Cookie", `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`);
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader("Set-Cookie", `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`);
 }
 
 function clearSession(response: Response) {
-  response.setHeader("Set-Cookie", `${sessionCookie}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`);
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader("Set-Cookie", `${sessionCookie}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
+}
+
+function loginKey(request: Request, email: string) {
+  return `${request.ip}:${email.trim().toLowerCase()}`;
+}
+
+function blockedUntil(key: string) {
+  const attempt = loginAttempts.get(key);
+  if (!attempt) return 0;
+  if (attempt.blockedUntil > 0 && attempt.blockedUntil <= Date.now()) {
+    loginAttempts.delete(key);
+    return 0;
+  }
+  return attempt.blockedUntil;
+}
+
+function registerLoginFailure(key: string) {
+  const current = loginAttempts.get(key);
+  const failures = (current?.failures ?? 0) + 1;
+  loginAttempts.set(key, { failures, blockedUntil: failures >= maxLoginFailures ? Date.now() + loginWindowMs : current?.blockedUntil ?? 0 });
 }
 
 async function startServer() {
@@ -91,8 +116,18 @@ async function startServer() {
   app.post("/api/auth/login", (req, res) => {
     const email = typeof req.body.email === "string" ? req.body.email : "";
     const password = typeof req.body.password === "string" ? req.body.password : "";
+    const key = loginKey(req, email);
+    const blocked = blockedUntil(key);
+    if (blocked) {
+      res.setHeader("Retry-After", Math.ceil((blocked - Date.now()) / 1000));
+      return res.status(429).json({ error: "Muitas tentativas. Tente novamente mais tarde." });
+    }
     const user = findUserByEmail(database, email);
-    if (!user || !verifyPassword(password, user.password_hash)) return res.status(401).json({ error: "E-mail ou senha inválidos." });
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      registerLoginFailure(key);
+      return res.status(401).json({ error: "E-mail ou senha inválidos." });
+    }
+    loginAttempts.delete(key);
     const session = createSession(database, user.id);
     setSession(res, session.token, session.expiresAt);
     return res.json({ id: user.id, email: user.email, name: user.name, createdAt: user.created_at });
