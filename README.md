@@ -4,7 +4,7 @@ Protótipo navegável da interface do RBR, uma ferramenta de planejamento e simu
 
 ## Branch
 
-Esta branch (`prototype/rbr-dark-ui`) contém a camada visual do protótipo em tema escuro. A `main` original foi preservada.
+Esta branch contém a interface do RBR em tema escuro. A `main` original foi preservada.
 
 ## Fluxo prototipado
 
