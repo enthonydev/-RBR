@@ -2,7 +2,7 @@ import express, { type Request, type Response } from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
-import { compareFinancing, type AmortizationGoal, type AmortizationMethod, type ExtraordinaryPayment, type FinancingInput } from "@shared/finance";
+import { type AmortizationGoal, type AmortizationMethod, type ExtraordinaryPayment, type FinancingInput } from "@shared/finance";
 import { addAmortization, claimOrphanedFinancings, createFinancing, createSession, createUser, deleteSession, findUserByEmail, getFinancingWithAmortizations, getUserBySession, listFinancings, openDatabase, removeAmortization, updateFinancing, verifyPassword } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -205,17 +205,6 @@ async function startServer() {
     if (!user) return undefined;
     const removed = removeAmortization(database, user.id, req.params.id, req.params.amortizationId);
     return removed ? res.status(204).send() : res.status(404).json({ error: "Amortização não encontrada." });
-  });
-
-  app.post("/api/simulations", (req, res) => {
-    try {
-      const input = readFinancingInput(req.body as Record<string, unknown>);
-      const { extraPayments = [], goal = "term" } = req.body as { extraPayments?: unknown; goal?: unknown };
-      if (!isGoal(goal) || !Array.isArray(extraPayments)) return res.status(400).json({ error: "Parâmetros de simulação inválidos." });
-      return res.json(compareFinancing(input, extraPayments as ExtraordinaryPayment[], goal));
-    } catch (error) {
-      return res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível calcular a simulação." });
-    }
   });
 
   const staticPath = process.env.NODE_ENV === "production" ? path.resolve(__dirname, "public") : path.resolve(__dirname, "..", "dist", "public");
