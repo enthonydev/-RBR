@@ -9,10 +9,7 @@ Aplicação de planejamento e simulação de financiamento imobiliário com inte
 - Simulação de juros, parcela, amortização e saldo.
 - Amortizações extraordinárias com redução de prazo ou parcela.
 - Resultado comparativo, tabela de amortização e cenários.
-- Persistência de financiamentos e amortizações no SQLite.
-- Cadastro e login por e-mail e senha.
-- Sessão em cookie HttpOnly com expiração de 30 dias.
-- Financiamentos filtrados pelo usuário autenticado.
+- Persistência de financiamentos e amortizações no SQLite, sob um usuário local único (sem login — RBR é uma ferramenta de uso pessoal).
 - Fallback para cálculo local quando a API não está disponível.
 
 ## Execução local
@@ -33,10 +30,6 @@ DATABASE_PATH=./data/rbr.sqlite pnpm start
 
 ## API principal
 
-- `POST /api/auth/register` — cria uma conta e inicia a sessão.
-- `POST /api/auth/login` — autentica uma conta existente.
-- `GET /api/auth/me` — retorna o usuário da sessão atual.
-- `POST /api/auth/logout` — encerra a sessão atual.
 - `GET /api/financings` — lista financiamentos salvos.
 - `POST /api/financings` — cria um financiamento e suas amortizações.
 - `GET /api/financings/:id` — recupera um financiamento com amortizações.
@@ -53,4 +46,4 @@ pnpm test
 pnpm build
 ```
 
-O banco usa SQLite nativo do Node 22. Senhas são armazenadas com salt e `scrypt`; o token bruto da sessão não é armazenado no banco. Em produção, a sessão usa cookie `Secure`. O login aceita até cinco falhas antes de bloquear novas tentativas por 15 minutos. Registros de financiamentos existentes sem proprietário são associados à primeira conta criada após a migração.
+O banco usa SQLite nativo do Node 22. Todo dado fica associado a um usuário local fixo (id `local`), criado automaticamente no primeiro start — não há tela de login. O schema mantém a separação por dono para o caso de um dia o app precisar ser multiusuário, mas hoje isso é transparente.

@@ -47,7 +47,6 @@ type SimulationConfig = {
   goal: AmortizationGoal;
 };
 
-type User = { id: string; name: string; email: string };
 
 const initialSimulation: SimulationConfig = {
   financing: { principal: 270000, annualRate: 12.5, termMonths: 360, method: "price" },
@@ -140,7 +139,7 @@ function DebtChart() {
   );
 }
 
-function AppShell({ screen, setScreen, children, onToast, user, onLogout }: { screen: Screen; setScreen: (screen: Screen) => void; children: React.ReactNode; onToast: (text: string) => void; user: User; onLogout: () => void }) {
+function AppShell({ screen, setScreen, children, onToast }: { screen: Screen; setScreen: (screen: Screen) => void; children: React.ReactNode; onToast: (text: string) => void }) {
   const [mobileMenu, setMobileMenu] = useState(false);
   const sections = ["Principal", "Análise"];
   return (
@@ -152,7 +151,7 @@ function AppShell({ screen, setScreen, children, onToast, user, onLogout }: { sc
           {sections.map((section) => <div className="nav-section" key={section}><span className="nav-section-label">{section}</span>{navItems.filter((item) => item.section === section).map((item) => { const Icon = item.icon; return <button key={item.id} className={`nav-item ${screen === item.id ? "active" : ""}`} onClick={() => { setScreen(item.id); setMobileMenu(false); }}><Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "result" && <span className="nav-badge">novo</span>}</button>; })}</div>)}
           <div className="nav-section nav-section-bottom"><span className="nav-section-label">Workspace</span><button className="nav-item muted" onClick={() => onToast("Histórico estará disponível em uma próxima versão.")}><Clock3 size={17} /><span>Histórico</span></button><button className="nav-item muted" onClick={() => onToast("Configurações estarão disponíveis em uma próxima versão.")}><Settings2 size={17} /><span>Configurações</span></button></div>
         </nav>
-        <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={17} /><div><strong>Documentação</strong><span>Notas do produto</span></div><ArrowRight size={15} /></div><button className="user-row" onClick={onLogout}><div className="avatar">{user.name.slice(0, 2).toUpperCase()}</div><div><strong>{user.name}</strong><span>{user.email}</span></div><MoreHorizontal size={18} /></button></div>
+        <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={17} /><div><strong>Documentação</strong><span>Notas do produto</span></div><ArrowRight size={15} /></div></div>
       </aside>
       <main className="main-content">
         <header className="topbar"><div className="topbar-left"><IconButton label="Abrir menu" className="mobile-menu" onClick={() => setMobileMenu(true)}><Menu size={20} /></IconButton><span className="topbar-context">RBR <span>/</span> {screen === "dashboard" ? "Visão geral" : navItems.find((item) => item.id === screen)?.label}</span></div><div className="topbar-actions"><button className="support-button" onClick={() => onToast("Tudo certo por aqui. Este é um protótipo navegável.")}><CircleHelp size={16} />Ajuda</button><button className="topbar-text-button" onClick={() => onToast("Nenhum alerta novo.")}>Alertas</button><div className="top-avatar">RS</div></div></header>
@@ -248,39 +247,7 @@ function Scenarios({ comparison, simulation, setScreen }: { comparison: Simulati
   return <section className="scenarios-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />VISÃO DE CENÁRIOS</div><h1>Comparar estratégias</h1><p>Compare prazo, juros e esforço de aporte.</p></div><button className="outline-button" onClick={() => setScreen("simulation")}><Plus size={15} /> Novo cenário</button></section><div className="scenario-hero"><div><span className="section-kicker">CENÁRIO SELECIONADO</span><h2>Referência · {formatCurrency(rows[0].amount)}</h2><p>Use este cenário como referência para comparar outras estratégias.</p></div><div className="scenario-hero-result"><span>ECONOMIA EM JUROS</span><strong>{formatCurrency(comparison.interestSavings)}</strong><small>- {comparison.monthsReduced} meses no prazo</small></div></div><div className="scenario-table panel"><div className="scenario-table-heading"><div><span className="section-kicker">COMPARAÇÃO RÁPIDA</span><h2>Cenários comparados</h2></div><span className="filter-button">Ordenar: economia</span></div><div className="scenario-list"><div className="scenario-row header"><span>CENÁRIO</span><span>APORTE</span><span>PRAZO FINAL</span><span>JUROS TOTAIS</span><span>ECONOMIA</span><span /></div>{rows.map((row, index) => <div className={`scenario-row ${index === 0 ? "selected" : ""}`} key={row.name}><div className="scenario-name"><div className={`scenario-dot ${index === 0 ? "reference" : index === 1 ? "ambitious" : "calm"}`} /><div><strong>{row.name}</strong><small>{row.detail}</small></div></div><span>{formatCurrency(row.amount)}</span><span>{formatDate(row.result.payoffMonth)}</span><span>{formatCurrency(row.result.totalInterest)}</span><strong className={index === 2 ? "muted-value" : "green-value"}>{index === 2 ? "—" : formatCurrency(comparison.baseline.totalInterest - row.result.totalInterest)}</strong><button className="row-more"><MoreHorizontal size={17} /></button></div>)}</div></div><div className="scenario-bottom"><div className="panel scenario-chart-card"><div className="panel-heading compact"><div><span className="section-kicker">ESFORÇO × RESULTADO</span><h2>Aporte anual × economia de juros</h2></div><Info size={17} className="muted-icon" /></div><div className="scatter"><div className="scatter-axis-y"><span>{formatCurrency(comparison.baseline.totalInterest)}</span><span>{formatCurrency(comparison.interestSavings)}</span><span>R$ 0</span></div><div className="scatter-field"><div className="scatter-line" /><div className="scatter-point point-a"><span>Acelerar</span></div><div className="scatter-point point-b"><span>Referência</span></div><div className="scatter-point point-c"><span>Constante</span></div><div className="scatter-x"><span>R$ 0</span><span>{formatCurrency(rows[0].amount)}</span><span>{formatCurrency(rows[1].amount)}</span></div></div></div></div><div className="panel compare-cta"><div className="compare-icon"><Copy size={18} /></div><h3>Comparar dois cenários</h3><p>Coloque duas estratégias lado a lado.</p><button className="secondary-button full" onClick={() => setScreen("result")}>Abrir comparação <ArrowRight size={15} /></button></div></div></section>;
 }
 
-function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/auth/${mode === "login" ? "login" : "register"}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Não foi possível autenticar.");
-      onAuthenticated(body);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Não foi possível autenticar.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return <main className="auth-page"><div className="auth-panel"><div className="brand-mark" aria-label="RBR"><div className="brand-symbol"><span /> <span /> <span /></div><div><strong>rbr<span>.</span></strong><small>real balance room</small></div></div><div className="eyebrow"><span className="eyebrow-line" />ACESSO SEGURO</div><h1>{mode === "login" ? "Entre no RBR" : "Crie sua conta"}</h1><p>{mode === "login" ? "Acesse seus financiamentos salvos." : "Salve suas simulações e amortizações."}</p>{mode === "register" && <Field label="Nome" value={name} onChange={setName} />}<Field label="E-mail" value={email} onChange={setEmail} /><Field label="Senha" value={password} onChange={setPassword} /><button className="primary-button full" disabled={busy} onClick={() => void submit()}>{busy ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}</button>{error && <p className="field-error">{error}</p>}<button className="text-button auth-switch" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }}>{mode === "login" ? "Ainda não tenho uma conta" : "Já tenho uma conta"}</button></div></main>;
-}
-
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [simulationStep, setSimulationStep] = useState<SimulationStep>(1);
   const [simulation, setSimulation] = useState<SimulationConfig>(initialSimulation);
@@ -288,14 +255,6 @@ export default function Home() {
   const comparison = comparisonFor(simulation);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((response) => response.ok ? response.json() : null)
-      .then((savedUser: User | null) => { setUser(savedUser); setAuthChecked(true); })
-      .catch(() => setAuthChecked(true));
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
     let active = true;
     fetch("/api/financings")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("API indisponível")))
@@ -306,7 +265,7 @@ export default function Home() {
       })
       .catch(() => undefined);
     return () => { active = false; };
-  }, [user?.id]);
+  }, []);
 
   const goTo = (next: Screen) => { setScreen(next); if (next === "simulation") setSimulationStep(1); };
   const notify = (text: string) => { setToast(text); window.setTimeout(() => setToast(null), 3200); };
@@ -333,8 +292,5 @@ export default function Home() {
     setSimulation(next);
   };
 
-  if (!authChecked) return <main className="auth-page"><div className="auth-panel"><strong>Carregando...</strong></div></main>;
-  if (!user) return <AuthScreen onAuthenticated={setUser} />;
-  const logout = async () => { await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined); setUser(null); };
-  return <AppShell screen={screen} setScreen={goTo} onToast={notify} user={user} onLogout={() => void logout()}>{screen === "dashboard" && <Dashboard setScreen={goTo} onToast={notify} />}{screen === "simulation" && <Simulation step={simulationStep} setStep={setSimulationStep} setScreen={goTo} onGenerate={generateSimulation} />}{screen === "result" && <Result comparison={comparison} setScreen={goTo} />}{screen === "table" && <AmortizationTable comparison={comparison} setScreen={goTo} onAddAmortization={addAmortization} />}{screen === "scenarios" && <Scenarios comparison={comparison} simulation={simulation} setScreen={goTo} />}{toast && <div className="toast"><div className="toast-check"><Check size={14} /></div><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Fechar mensagem"><X size={14} /></button></div>}</AppShell>;
+  return <AppShell screen={screen} setScreen={goTo} onToast={notify}>{screen === "dashboard" && <Dashboard setScreen={goTo} onToast={notify} />}{screen === "simulation" && <Simulation step={simulationStep} setStep={setSimulationStep} setScreen={goTo} onGenerate={generateSimulation} />}{screen === "result" && <Result comparison={comparison} setScreen={goTo} />}{screen === "table" && <AmortizationTable comparison={comparison} setScreen={goTo} onAddAmortization={addAmortization} />}{screen === "scenarios" && <Scenarios comparison={comparison} simulation={simulation} setScreen={goTo} />}{toast && <div className="toast"><div className="toast-check"><Check size={14} /></div><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Fechar mensagem"><X size={14} /></button></div>}</AppShell>;
 }
