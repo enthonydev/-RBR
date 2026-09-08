@@ -47,6 +47,7 @@ type SimulationConfig = {
   goal: AmortizationGoal;
 };
 
+
 const initialSimulation: SimulationConfig = {
   financing: { principal: 270000, annualRate: 12.5, termMonths: 360, method: "price" },
   extraPayments: [{ month: 10, amount: 20000 }],
@@ -150,7 +151,7 @@ function AppShell({ screen, setScreen, children, onToast }: { screen: Screen; se
           {sections.map((section) => <div className="nav-section" key={section}><span className="nav-section-label">{section}</span>{navItems.filter((item) => item.section === section).map((item) => { const Icon = item.icon; return <button key={item.id} className={`nav-item ${screen === item.id ? "active" : ""}`} onClick={() => { setScreen(item.id); setMobileMenu(false); }}><Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "result" && <span className="nav-badge">novo</span>}</button>; })}</div>)}
           <div className="nav-section nav-section-bottom"><span className="nav-section-label">Workspace</span><button className="nav-item muted" onClick={() => onToast("Histórico estará disponível em uma próxima versão.")}><Clock3 size={17} /><span>Histórico</span></button><button className="nav-item muted" onClick={() => onToast("Configurações estarão disponíveis em uma próxima versão.")}><Settings2 size={17} /><span>Configurações</span></button></div>
         </nav>
-        <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={17} /><div><strong>Documentação</strong><span>Notas do produto</span></div><ArrowRight size={15} /></div><div className="user-row"><div className="avatar">RS</div><div><strong>Rafael Souza</strong><span>Plano pessoal</span></div><MoreHorizontal size={18} /></div></div>
+        <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={17} /><div><strong>Documentação</strong><span>Notas do produto</span></div><ArrowRight size={15} /></div></div>
       </aside>
       <main className="main-content">
         <header className="topbar"><div className="topbar-left"><IconButton label="Abrir menu" className="mobile-menu" onClick={() => setMobileMenu(true)}><Menu size={20} /></IconButton><span className="topbar-context">RBR <span>/</span> {screen === "dashboard" ? "Visão geral" : navItems.find((item) => item.id === screen)?.label}</span></div><div className="topbar-actions"><button className="support-button" onClick={() => onToast("Tudo certo por aqui. Este é um protótipo navegável.")}><CircleHelp size={16} />Ajuda</button><button className="topbar-text-button" onClick={() => onToast("Nenhum alerta novo.")}>Alertas</button><div className="top-avatar">RS</div></div></header>
@@ -245,6 +246,7 @@ function Scenarios({ comparison, simulation, setScreen }: { comparison: Simulati
   ];
   return <section className="scenarios-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />VISÃO DE CENÁRIOS</div><h1>Comparar estratégias</h1><p>Compare prazo, juros e esforço de aporte.</p></div><button className="outline-button" onClick={() => setScreen("simulation")}><Plus size={15} /> Novo cenário</button></section><div className="scenario-hero"><div><span className="section-kicker">CENÁRIO SELECIONADO</span><h2>Referência · {formatCurrency(rows[0].amount)}</h2><p>Use este cenário como referência para comparar outras estratégias.</p></div><div className="scenario-hero-result"><span>ECONOMIA EM JUROS</span><strong>{formatCurrency(comparison.interestSavings)}</strong><small>- {comparison.monthsReduced} meses no prazo</small></div></div><div className="scenario-table panel"><div className="scenario-table-heading"><div><span className="section-kicker">COMPARAÇÃO RÁPIDA</span><h2>Cenários comparados</h2></div><span className="filter-button">Ordenar: economia</span></div><div className="scenario-list"><div className="scenario-row header"><span>CENÁRIO</span><span>APORTE</span><span>PRAZO FINAL</span><span>JUROS TOTAIS</span><span>ECONOMIA</span><span /></div>{rows.map((row, index) => <div className={`scenario-row ${index === 0 ? "selected" : ""}`} key={row.name}><div className="scenario-name"><div className={`scenario-dot ${index === 0 ? "reference" : index === 1 ? "ambitious" : "calm"}`} /><div><strong>{row.name}</strong><small>{row.detail}</small></div></div><span>{formatCurrency(row.amount)}</span><span>{formatDate(row.result.payoffMonth)}</span><span>{formatCurrency(row.result.totalInterest)}</span><strong className={index === 2 ? "muted-value" : "green-value"}>{index === 2 ? "—" : formatCurrency(comparison.baseline.totalInterest - row.result.totalInterest)}</strong><button className="row-more"><MoreHorizontal size={17} /></button></div>)}</div></div><div className="scenario-bottom"><div className="panel scenario-chart-card"><div className="panel-heading compact"><div><span className="section-kicker">ESFORÇO × RESULTADO</span><h2>Aporte anual × economia de juros</h2></div><Info size={17} className="muted-icon" /></div><div className="scatter"><div className="scatter-axis-y"><span>{formatCurrency(comparison.baseline.totalInterest)}</span><span>{formatCurrency(comparison.interestSavings)}</span><span>R$ 0</span></div><div className="scatter-field"><div className="scatter-line" /><div className="scatter-point point-a"><span>Acelerar</span></div><div className="scatter-point point-b"><span>Referência</span></div><div className="scatter-point point-c"><span>Constante</span></div><div className="scatter-x"><span>R$ 0</span><span>{formatCurrency(rows[0].amount)}</span><span>{formatCurrency(rows[1].amount)}</span></div></div></div></div><div className="panel compare-cta"><div className="compare-icon"><Copy size={18} /></div><h3>Comparar dois cenários</h3><p>Coloque duas estratégias lado a lado.</p><button className="secondary-button full" onClick={() => setScreen("result")}>Abrir comparação <ArrowRight size={15} /></button></div></div></section>;
 }
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [simulationStep, setSimulationStep] = useState<SimulationStep>(1);
@@ -259,34 +261,17 @@ export default function Home() {
       .then((items: Array<{ id: string }>) => items[0] ? fetch(`/api/financings/${items[0].id}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Financiamento indisponível"))) : null)
       .then((saved: { id: string; principal: number; annualRate: number; termMonths: number; method: FinancingInput["method"]; amortizations?: Array<{ month: number; amount: number; goal: AmortizationGoal }> } | null) => {
         if (!active || !saved) return;
-        setSimulation({
-          financingId: saved.id,
-          financing: { principal: saved.principal, annualRate: saved.annualRate, termMonths: saved.termMonths, method: saved.method },
-          extraPayments: saved.amortizations?.map(({ month, amount }) => ({ month, amount })) ?? [],
-          goal: saved.amortizations?.[0]?.goal ?? "term",
-        });
+        setSimulation({ financingId: saved.id, financing: { principal: saved.principal, annualRate: saved.annualRate, termMonths: saved.termMonths, method: saved.method }, extraPayments: saved.amortizations?.map(({ month, amount }) => ({ month, amount })) ?? [], goal: saved.amortizations?.[0]?.goal ?? "term" });
       })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
 
-  const goTo = (next: Screen) => {
-    setScreen(next);
-    if (next === "simulation") setSimulationStep(1);
-  };
-
-  const notify = (text: string) => {
-    setToast(text);
-    window.setTimeout(() => setToast(null), 3200);
-  };
-
+  const goTo = (next: Screen) => { setScreen(next); if (next === "simulation") setSimulationStep(1); };
+  const notify = (text: string) => { setToast(text); window.setTimeout(() => setToast(null), 3200); };
   const generateSimulation = async (next: SimulationConfig) => {
     try {
-      const response = await fetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", {
-        method: next.financingId ? "PUT" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...next.financing, name: "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }),
-      });
+      const response = await fetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", { method: next.financingId ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...next.financing, name: "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }) });
       if (!response.ok) throw new Error("Não foi possível salvar");
       const saved = await response.json() as { id: string };
       setSimulation({ ...next, financingId: saved.id });
@@ -296,27 +281,14 @@ export default function Home() {
     }
     setScreen("result");
   };
-
   const addAmortization = async (payment: ExtraordinaryPayment) => {
-    if (!Number.isInteger(payment.month) || payment.month <= 0 || payment.amount <= 0) {
-      notify("Informe uma parcela e um valor de aporte válidos.");
-      return;
-    }
+    if (!Number.isInteger(payment.month) || payment.month <= 0 || payment.amount <= 0) { notify("Informe uma parcela e um valor de aporte válidos."); return; }
     const next = { ...simulation, extraPayments: [...simulation.extraPayments, payment] };
-    if (!simulation.financingId) {
-      setSimulation(next);
-      return;
-    }
+    if (!simulation.financingId) { setSimulation(next); return; }
     try {
-      const response = await fetch(`/api/financings/${simulation.financingId}/amortizations`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...payment, goal: simulation.goal }),
-      });
+      const response = await fetch(`/api/financings/${simulation.financingId}/amortizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payment, goal: simulation.goal }) });
       if (!response.ok) throw new Error("Não foi possível salvar");
-    } catch {
-      notify("A amortização foi aplicada nesta sessão, mas não foi persistida no banco.");
-    }
+    } catch { notify("A amortização foi aplicada nesta sessão, mas não foi persistida no banco."); }
     setSimulation(next);
   };
 

@@ -80,6 +80,7 @@ export function simulateFinancing(input: FinancingInput, extraPayments: Extraord
   const rows: ScheduleRow[] = [];
   let balance = cents(input.principal);
   let paymentAfterExtra = 0;
+  let sacPrincipalAfterExtra = 0;
   const basePayment = pricePayment(input.principal, monthlyRate, input.termMonths);
 
   for (let month = 1; month <= input.termMonths && balance > 0; month += 1) {
@@ -87,7 +88,9 @@ export function simulateFinancing(input: FinancingInput, extraPayments: Extraord
     const remainingMonths = input.termMonths - month + 1;
     const interest = cents(openingBalance * monthlyRate);
     const scheduled = goal === "payment" && paymentAfterExtra > 0
-      ? paymentAfterExtra
+      ? input.method === "sac"
+        ? cents(sacPrincipalAfterExtra + interest)
+        : paymentAfterExtra
       : input.method === "price" && goal === "term"
         ? basePayment
         : calculateScheduledPayment(input.method, openingBalance, monthlyRate, remainingMonths, input.principal, input.termMonths);
@@ -100,9 +103,13 @@ export function simulateFinancing(input: FinancingInput, extraPayments: Extraord
     balance = closingBalance;
 
     if (goal === "payment" && extra > 0 && balance > 0) {
-      paymentAfterExtra = input.method === "price"
-        ? pricePayment(balance, monthlyRate, input.termMonths - month)
-        : calculateScheduledPayment(input.method, balance, monthlyRate, input.termMonths - month, input.principal, input.termMonths);
+      const remainingAfterExtra = Math.max(1, input.termMonths - month);
+      if (input.method === "price") {
+        paymentAfterExtra = pricePayment(balance, monthlyRate, remainingAfterExtra);
+      } else {
+        sacPrincipalAfterExtra = cents(balance / remainingAfterExtra);
+        paymentAfterExtra = sacPrincipalAfterExtra;
+      }
     }
   }
 

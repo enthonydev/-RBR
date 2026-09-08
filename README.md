@@ -9,7 +9,7 @@ Aplicação de planejamento e simulação de financiamento imobiliário com inte
 - Simulação de juros, parcela, amortização e saldo.
 - Amortizações extraordinárias com redução de prazo ou parcela.
 - Resultado comparativo, tabela de amortização e cenários.
-- Persistência de financiamentos e amortizações no SQLite.
+- Persistência de financiamentos e amortizações no SQLite, sob um usuário local único (sem login — RBR é uma ferramenta de uso pessoal).
 - Fallback para cálculo local quando a API não está disponível.
 
 ## Execução local
@@ -46,4 +46,4 @@ pnpm test
 pnpm build
 ```
 
-O banco usa SQLite nativo do Node 22. Nesta etapa não há autenticação nem separação de dados por usuário.
+O banco usa SQLite nativo do Node 22. Todo dado fica associado a um usuário local fixo (id `local`), criado automaticamente no primeiro start — não há tela de login. O schema mantém a separação por dono para o caso de um dia o app precisar ser multiusuário, mas hoje isso é transparente.
