@@ -1,8 +1,14 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import type { AmortizationGoal, AmortizationMethod, ExtraordinaryPayment, FinancingInput } from "@shared/finance";
+
+// RBR é uma ferramenta de uso pessoal (um financiamento, um dono). Em vez de
+// login/senha, todo dado fica associado a este id fixo, criado uma vez no
+// primeiro start. Isso mantém a separação de dados por dono no schema
+// (útil se um dia virar multiusuário) sem exigir tela de autenticação agora.
+const LOCAL_USER_ID = "local";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
 type Database = InstanceType<typeof DatabaseSync>;
@@ -54,8 +60,7 @@ type AmortizationRow = {
   created_at: string;
 };
 
-type UserRow = { id: string; email: string; name: string; password_hash: string; created_at: string };
-type SessionRow = { user_id: string; expires_at: string };
+type UserRow = { id: string; email: string; name: string; created_at: string };
 
 const schema = `
   PRAGMA foreign_keys = ON;
@@ -63,13 +68,7 @@ const schema = `
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    password_hash TEXT NOT NULL,
     created_at TEXT NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at TEXT NOT NULL
   );
   CREATE TABLE IF NOT EXISTS financings (
     id TEXT PRIMARY KEY,
@@ -106,65 +105,26 @@ function toAmortization(row: AmortizationRow): AmortizationRecord {
   return { id: row.id, financingId: row.financing_id, month: row.month, amount: row.amount, goal: row.goal, createdAt: row.created_at };
 }
 
-function sessionId(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-
 export function openDatabase(databasePath = process.env.DATABASE_PATH ?? path.resolve(process.cwd(), "data", "rbr.sqlite")) {
   mkdirSync(path.dirname(databasePath), { recursive: true });
   const database = new DatabaseSync(databasePath);
   database.exec(schema);
-  const columns = database.prepare(`PRAGMA table_info(financings)`).all() as Array<{ name: string }>;
-  if (!columns.some((column) => column.name === "user_id")) database.exec(`ALTER TABLE financings ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE`);
   return database;
 }
 
-export function createUser(database: Database, email: string, name: string, password: string) {
+export function createUser(database: Database, id: string, email: string, name: string) {
   const normalizedEmail = email.trim().toLowerCase();
-  const salt = randomBytes(16).toString("hex");
-  const passwordHash = `${salt}:${scryptSync(password, salt, 64).toString("hex")}`;
-  const user = { id: randomUUID(), email: normalizedEmail, name: name.trim() || normalizedEmail.split("@")[0], passwordHash, createdAt: new Date().toISOString() };
-  database.prepare(`INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)`).run(user.id, user.email, user.name, user.passwordHash, user.createdAt);
+  const user = { id, email: normalizedEmail, name: name.trim() || normalizedEmail.split("@")[0], createdAt: new Date().toISOString() };
+  database.prepare(`INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?)`).run(user.id, user.email, user.name, user.createdAt);
   return { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt };
 }
 
-export function claimOrphanedFinancings(database: Database, userId: string) {
-  const users = database.prepare(`SELECT COUNT(*) AS count FROM users`).get() as { count: number };
-  if (users.count === 1) database.prepare(`UPDATE financings SET user_id = ? WHERE user_id IS NULL`).run(userId);
-}
-
-export function findUserByEmail(database: Database, email: string) {
-  const row = database.prepare(`SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?`).get(email.trim().toLowerCase()) as UserRow | undefined;
-  return row ?? null;
-}
-
-export function verifyPassword(password: string, storedHash: string) {
-  const [salt, hash] = storedHash.split(":");
-  if (!salt || !hash) return false;
-  const actual = scryptSync(password, salt, 64);
-  const expected = Buffer.from(hash, "hex");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
-export function createSession(database: Database, userId: string, days = 30) {
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-  database.prepare(`INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)`).run(sessionId(token), userId, expiresAt);
-  return { token, expiresAt };
-}
-
-export function getUserBySession(database: Database, token: string) {
-  const row = database.prepare(`SELECT u.id, u.email, u.name, u.created_at, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`).get(sessionId(token)) as (UserRow & { expires_at: string }) | undefined;
-  if (!row) return null;
-  if (new Date(row.expires_at) <= new Date()) {
-    database.prepare(`DELETE FROM sessions WHERE id = ?`).run(sessionId(token));
-    return null;
-  }
-  return toUser(row);
-}
-
-export function deleteSession(database: Database, token: string) {
-  database.prepare(`DELETE FROM sessions WHERE id = ?`).run(sessionId(token));
+// Garante que o usuário local exista e devolve seu id. Chamar uma vez no
+// start do servidor; todas as rotas de financiamento usam esse id.
+export function ensureLocalUser(database: Database) {
+  const existing = database.prepare(`SELECT id, email, name, created_at FROM users WHERE id = ?`).get(LOCAL_USER_ID) as UserRow | undefined;
+  if (existing) return toUser(existing);
+  return createUser(database, LOCAL_USER_ID, "local@rbr.app", "Você");
 }
 
 export function createFinancing(database: Database, userId: string, input: FinancingInput, name = "Meu financiamento") {

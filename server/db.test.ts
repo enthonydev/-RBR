@@ -1,22 +1,19 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { addAmortization, createFinancing, createSession, createUser, deleteSession, getFinancingWithAmortizations, getUserBySession, listFinancings, openDatabase, removeAmortization, verifyPassword } from "./db";
+import { addAmortization, createFinancing, createUser, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization } from "./db";
 
 describe("financing database", () => {
-  it("cria usuário, verifica senha e controla a sessão", () => {
+  it("garante o usuário local de forma idempotente", () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "rbr-"));
     const database = openDatabase(path.join(directory, "test.sqlite"));
-    const user = createUser(database, "auth@example.com", "Auth", "password123");
-    const stored = database.prepare(`SELECT password_hash FROM users WHERE id = ?`).get(user.id) as { password_hash: string };
-    const session = createSession(database, user.id);
 
-    expect(verifyPassword("password123", stored.password_hash)).toBe(true);
-    expect(verifyPassword("wrong-password", stored.password_hash)).toBe(false);
-    expect(getUserBySession(database, session.token)?.id).toBe(user.id);
-    deleteSession(database, session.token);
-    expect(getUserBySession(database, session.token)).toBeNull();
+    const first = ensureLocalUser(database);
+    const second = ensureLocalUser(database);
+    expect(first.id).toBe(second.id);
+    expect(first.email).toBe(second.email);
 
     database.close();
     rmSync(directory, { recursive: true, force: true });
@@ -25,7 +22,7 @@ describe("financing database", () => {
   it("persiste financiamento e amortização vinculada ao usuário", () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "rbr-"));
     const database = openDatabase(path.join(directory, "test.sqlite"));
-    const user = createUser(database, "owner@example.com", "Owner", "password123");
+    const user = ensureLocalUser(database);
 
     const financing = createFinancing(database, user.id, { principal: 270000, annualRate: 12.5, termMonths: 360, method: "price" }, "Casa");
     const amortization = addAmortization(database, user.id, financing.id, { month: 10, amount: 20000 }, "term");
@@ -38,11 +35,11 @@ describe("financing database", () => {
     rmSync(directory, { recursive: true, force: true });
   });
 
-  it("não permite que um usuário leia ou remova o financiamento de outro", () => {
+  it("não permite que um dono leia ou remova o financiamento de outro", () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), "rbr-"));
     const database = openDatabase(path.join(directory, "test.sqlite"));
-    const owner = createUser(database, "owner@example.com", "Owner", "password123");
-    const other = createUser(database, "other@example.com", "Other", "password123");
+    const owner = createUser(database, randomUUID(), "owner@example.com", "Owner");
+    const other = createUser(database, randomUUID(), "other@example.com", "Other");
     const financing = createFinancing(database, owner.id, { principal: 100000, annualRate: 10, termMonths: 120, method: "sac" });
     const amortization = addAmortization(database, owner.id, financing.id, { month: 12, amount: 5000 }, "payment")!;
 
