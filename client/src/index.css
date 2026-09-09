@@ -209,3 +209,6 @@ body { background: #101416; color: #e8ece9; }
 .property-menu .property-new { display: flex; align-items: center; gap: 7px; margin-top: 4px; border-top: 1px solid #2b3538; color: #a8c7ef; }
 .property-menu .property-delete { color: #d5a7a1; }
 .empty-state { padding: 25px; color: #899591; font-size: 12px; }
+.scatter-field { margin-bottom: 25px; }
+.scatter-point { transform: translate(-50%, 50%); }
+.scatter-point span { transform: translateX(-50%); }
