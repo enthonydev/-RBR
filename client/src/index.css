@@ -199,3 +199,13 @@ body { background: #101416; color: #e8ece9; }
 
 
 .input-wrap select { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; color: #e8eeeb; background: transparent; cursor: pointer; font: 500 12px 'DM Mono', monospace; }
+
+.property-select { position: relative; margin-bottom: 28px; }
+.property-select .property-switcher { width: 100%; margin-bottom: 0; cursor: pointer; text-align: left; }
+.property-menu { position: absolute; z-index: 30; top: calc(100% + 7px); left: 0; right: 0; padding: 5px; border: 1px solid #303a3d; background: #151b1e; box-shadow: 0 12px 25px rgba(0,0,0,.25); }
+.property-menu button { width: 100%; display: block; padding: 9px; border: 0; color: #d7e0db; background: transparent; text-align: left; font-size: 11px; }
+.property-menu button:hover { background: #202b30; }
+.property-menu small { display: block; margin-top: 3px; color: #82908a; font: 9px 'IBM Plex Mono', monospace; }
+.property-menu .property-new { display: flex; align-items: center; gap: 7px; margin-top: 4px; border-top: 1px solid #2b3538; color: #a8c7ef; }
+.property-menu .property-delete { color: #d5a7a1; }
+.empty-state { padding: 25px; color: #899591; font-size: 12px; }

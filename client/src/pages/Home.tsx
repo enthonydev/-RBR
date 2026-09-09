@@ -37,18 +37,22 @@ import {
 } from "lucide-react";
 import { compareFinancing, parseCurrency, simulateFinancing, type AmortizationGoal, type ExtraordinaryPayment, type FinancingInput, type SimulationComparison } from "@shared/finance";
 
-type Screen = "dashboard" | "simulation" | "result" | "table" | "scenarios";
+type Screen = "dashboard" | "simulation" | "result" | "table" | "scenarios" | "history";
 type SimulationStep = 1 | 2;
 
 type SimulationConfig = {
   financingId?: string;
+  name?: string;
   financing: FinancingInput;
   extraPayments: ExtraordinaryPayment[];
   goal: AmortizationGoal;
 };
 
+type FinancingSummary = FinancingInput & { id: string; name: string; updatedAt: string };
+
 
 const initialSimulation: SimulationConfig = {
+  name: "Casa Vila Mariana",
   financing: { principal: 270000, annualRate: 12.5, termMonths: 360, method: "price" },
   extraPayments: [{ month: 10, amount: 20000 }],
   goal: "term",
@@ -63,6 +67,7 @@ const navItems: Array<{ id: Screen; label: string; icon: IconType; section: stri
   { id: "result", label: "Resultado", icon: FileChartColumnIncreasing, section: "Análise" },
   { id: "table", label: "Tabela de amortização", icon: Table2, section: "Análise" },
   { id: "scenarios", label: "Cenários", icon: Target, section: "Análise" },
+  { id: "history", label: "Histórico", icon: Clock3, section: "Workspace" },
 ];
 
 const defaultFinancing = initialSimulation.financing;
@@ -139,17 +144,19 @@ function DebtChart() {
   );
 }
 
-function AppShell({ screen, setScreen, children, onToast }: { screen: Screen; setScreen: (screen: Screen) => void; children: React.ReactNode; onToast: (text: string) => void }) {
+function AppShell({ screen, setScreen, children, onToast, financings, selectedId, onSelectFinancing, onNewFinancing, onDeleteFinancing }: { screen: Screen; setScreen: (screen: Screen) => void; children: React.ReactNode; onToast: (text: string) => void; financings: FinancingSummary[]; selectedId?: string; onSelectFinancing: (id: string) => void; onNewFinancing: () => void; onDeleteFinancing: (id: string) => void }) {
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [propertyMenu, setPropertyMenu] = useState(false);
+  const selected = financings.find((item) => item.id === selectedId);
   const sections = ["Principal", "Análise"];
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}>
         <div className="sidebar-top"><Logo /><IconButton label="Fechar menu" className="mobile-close" onClick={() => setMobileMenu(false)}><X size={18} /></IconButton></div>
-        <div className="property-switcher"><div className="property-icon"><HomeIcon size={16} /></div><div><span>Financiamento atual</span><strong>Casa Vila Mariana</strong></div><ChevronDown size={15} /></div>
+        <div className="property-select"><button className="property-switcher" onClick={() => setPropertyMenu((open) => !open)}><div className="property-icon"><HomeIcon size={16} /></div><div><span>Financiamento atual</span><strong>{selected?.name ?? "Nenhum financiamento"}</strong></div><ChevronDown size={15} /></button>{propertyMenu && <div className="property-menu">{financings.map((item) => <button key={item.id} onClick={() => { onSelectFinancing(item.id); setPropertyMenu(false); }}>{item.name}<small>{item.method === "sac" ? "SAC" : "Price"} · {formatCurrency(item.principal)}</small></button>)}<button className="property-new" onClick={() => { onNewFinancing(); setPropertyMenu(false); }}><Plus size={14} /> Novo imóvel</button>{selected && <button className="property-delete" onClick={() => { if (window.confirm(`Excluir ${selected.name}?`)) { onDeleteFinancing(selected.id); setPropertyMenu(false); } }}>Excluir financiamento</button>}</div>}</div>
         <nav className="sidebar-nav" aria-label="Navegação principal">
           {sections.map((section) => <div className="nav-section" key={section}><span className="nav-section-label">{section}</span>{navItems.filter((item) => item.section === section).map((item) => { const Icon = item.icon; return <button key={item.id} className={`nav-item ${screen === item.id ? "active" : ""}`} onClick={() => { setScreen(item.id); setMobileMenu(false); }}><Icon size={17} strokeWidth={1.8} /><span>{item.label}</span>{item.id === "result" && <span className="nav-badge">novo</span>}</button>; })}</div>)}
-          <div className="nav-section nav-section-bottom"><span className="nav-section-label">Workspace</span><button className="nav-item muted" onClick={() => onToast("Histórico estará disponível em uma próxima versão.")}><Clock3 size={17} /><span>Histórico</span></button><button className="nav-item muted" onClick={() => onToast("Configurações estarão disponíveis em uma próxima versão.")}><Settings2 size={17} /><span>Configurações</span></button></div>
+          <div className="nav-section nav-section-bottom"><span className="nav-section-label">Workspace</span><button className="nav-item muted" onClick={() => onToast("Configurações estarão disponíveis em uma próxima versão.")}><Settings2 size={17} /><span>Configurações</span></button></div>
         </nav>
         <div className="sidebar-bottom"><div className="help-card"><CircleHelp size={17} /><div><strong>Documentação</strong><span>Notas do produto</span></div><ArrowRight size={15} /></div></div>
       </aside>
@@ -181,6 +188,7 @@ function Field({ label, value, hint, prefix, suffix, onChange }: { label: string
 }
 
 function Simulation({ step, setStep, setScreen, onGenerate }: { step: SimulationStep; setStep: (step: SimulationStep) => void; setScreen: (screen: Screen) => void; onGenerate: (simulation: SimulationConfig) => void | Promise<void> }) {
+  const [propertyName, setPropertyName] = useState("Casa Vila Mariana");
   const [propertyValue, setPropertyValue] = useState("300.000");
   const [downPayment, setDownPayment] = useState("30.000");
   const [financedValue, setFinancedValue] = useState("270.000");
@@ -222,7 +230,7 @@ function Simulation({ step, setStep, setScreen, onGenerate }: { step: Simulation
     }
   };
 
-  return <section className="simulation-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />NOVA SIMULAÇÃO</div><h1>Nova simulação</h1><p>Informe os dados do contrato e escolha uma estratégia de amortização.</p></div><StatusPill>Dados locais e salvos</StatusPill></section><Stepper step={step} />{step === 1 ? <div className="simulation-layout"><div className="panel form-panel"><div className="form-heading"><div className="form-number">01</div><div><span className="section-kicker">DADOS DO FINANCIAMENTO</span><h2>Vamos começar pelo básico.</h2><p>Use os dados do contrato para criar uma base fiel.</p></div></div><div className="form-grid"><Field label="Valor do imóvel" prefix="R$" value={propertyValue} onChange={setPropertyValue} /><Field label="Entrada" prefix="R$" value={downPayment} hint="A entrada será abatida do valor financiado." onChange={(value) => { setDownPayment(value); setFinancedValue(String(Math.max(0, safeCurrency(propertyValue) - safeCurrency(value)))); }} /><Field label="Valor financiado" prefix="R$" value={financedValue} onChange={setFinancedValue} /><Field label="Taxa de juros" value={annualRate} suffix="% a.a." onChange={setAnnualRate} /><label className="field"><span>Sistema de amortização</span><div className="input-wrap"><select value={method} onChange={(event) => setMethod(event.target.value as FinancingInput["method"])}><option value="price">Price</option><option value="sac">SAC</option></select></div></label><Field label="Prazo total" value={termMonths} suffix="meses" onChange={setTermMonths} /></div>{error && <p className="field-error">{error}</p>}<div className="form-footer"><span><Info size={15} /> Os dados ficam nesta sessão até salvar.</span><button className="primary-button" onClick={continueToStrategy}>Continuar <ArrowRight size={16} /></button></div></div><aside className="panel form-aside"><div className="aside-icon"><HomeIcon size={19} /></div><span className="section-kicker">CONTRATO</span><h3>Casa Vila Mariana</h3><p>Uma referência para o contrato que você está planejando.</p><div className="aside-details"><div><span>Financiado</span><strong>{safeCurrency(propertyValue) > 0 ? `${Math.round(safeCurrency(financedValue) / safeCurrency(propertyValue) * 100)}%` : "—"}</strong></div><div><span>Parcela estimada</span><strong>{projection ? formatCurrency(projection.scheduledPayment) : "—"}</strong></div></div><div className="aside-quote"><span>“</span><p>Dados do contrato. Decisões melhores.</p></div></aside></div> : <div className="simulation-layout"><div className="panel form-panel"><div className="form-heading"><div className="form-number green">02</div><div><span className="section-kicker">ESTRATÉGIA DE AMORTIZAÇÃO</span><h2>Defina a estratégia</h2><p>Escolha o aporte e o objetivo da amortização.</p></div></div><div className="strategy-options"><button className="strategy-option selected"><div className="strategy-radio"><Check size={13} /></div><div><strong>Amortização extraordinária</strong><span>Aplicar um aporte na parcela escolhida.</span></div><span className="option-tag">Disponível</span></button></div><div className="form-grid strategy-grid"><Field label="Valor do aporte" prefix="R$" value={extraValue} onChange={setExtraValue} /><Field label="Parcela do aporte" value={extraMonth} suffix="mês" onChange={setExtraMonth} /><Field label="Frequência" value="Único" /><Field label="Sistema" value={method === "sac" ? "SAC" : "Price"} /></div><div className="objective-block"><span className="field-label">Objetivo da amortização</span><div className="segmented"><button className={goal === "term" ? "selected" : ""} onClick={() => setGoal("term")}><TrendingDown size={16} />Reduzir prazo</button><button className={goal === "payment" ? "selected" : ""} onClick={() => setGoal("payment")}><ReceiptText size={16} />Reduzir parcela</button></div></div><div className="form-footer"><button className="back-button" onClick={() => setStep(1)}><ArrowLeft size={16} /> Voltar</button><button className="primary-button" onClick={() => { if (!projection) { setError("Revise os dados da amortização."); return; } void onGenerate({ financing, extraPayments, goal }); }}>Salvar e gerar simulação <Sparkles size={16} /></button></div></div><aside className="panel form-aside strategy-aside"><div className="strategy-preview"><span>IMPACTO PREVISTO</span><strong>{projection ? `- ${Math.max(0, financing.termMonths - projection.payoffMonth)} meses` : "—"}</strong><small>no prazo total</small></div><div className="mini-bars"><div><span>Sem aporte</span><i style={{ width: "92%" }} /></div><div><span>Com aporte</span><i style={{ width: projection && financing.termMonths > 0 ? `${Math.max(20, projection.payoffMonth / financing.termMonths * 92)}%` : "92%" }} /></div></div><p className="aside-note"><Info size={15} /> O resultado será calculado com os dados informados.</p></aside></div>}</section>;
+  return <section className="simulation-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />NOVA SIMULAÇÃO</div><h1>Nova simulação</h1><p>Informe os dados do contrato e escolha uma estratégia de amortização.</p></div><StatusPill>Dados locais e salvos</StatusPill></section><Stepper step={step} />{step === 1 ? <div className="simulation-layout"><div className="panel form-panel"><div className="form-heading"><div className="form-number">01</div><div><span className="section-kicker">DADOS DO FINANCIAMENTO</span><h2>Vamos começar pelo básico.</h2><p>Use os dados do contrato para criar uma base fiel.</p></div></div><div className="form-grid"><Field label="Nome do imóvel" value={propertyName} onChange={setPropertyName} /><Field label="Valor do imóvel" prefix="R$" value={propertyValue} onChange={setPropertyValue} /><Field label="Entrada" prefix="R$" value={downPayment} hint="A entrada será abatida do valor financiado." onChange={(value) => { setDownPayment(value); setFinancedValue(String(Math.max(0, safeCurrency(propertyValue) - safeCurrency(value)))); }} /><Field label="Valor financiado" prefix="R$" value={financedValue} onChange={setFinancedValue} /><Field label="Taxa de juros" value={annualRate} suffix="% a.a." onChange={setAnnualRate} /><label className="field"><span>Sistema de amortização</span><div className="input-wrap"><select value={method} onChange={(event) => setMethod(event.target.value as FinancingInput["method"])}><option value="price">Price</option><option value="sac">SAC</option></select></div></label><Field label="Prazo total" value={termMonths} suffix="meses" onChange={setTermMonths} /></div>{error && <p className="field-error">{error}</p>}<div className="form-footer"><span><Info size={15} /> Os dados ficam nesta sessão até salvar.</span><button className="primary-button" onClick={continueToStrategy}>Continuar <ArrowRight size={16} /></button></div></div><aside className="panel form-aside"><div className="aside-icon"><HomeIcon size={19} /></div><span className="section-kicker">CONTRATO</span><h3>{propertyName || "Novo imóvel"}</h3><p>Uma referência para o contrato que você está planejando.</p><div className="aside-details"><div><span>Financiado</span><strong>{safeCurrency(propertyValue) > 0 ? `${Math.round(safeCurrency(financedValue) / safeCurrency(propertyValue) * 100)}%` : "—"}</strong></div><div><span>Parcela estimada</span><strong>{projection ? formatCurrency(projection.scheduledPayment) : "—"}</strong></div></div><div className="aside-quote"><span>“</span><p>Dados do contrato. Decisões melhores.</p></div></aside></div> : <div className="simulation-layout"><div className="panel form-panel"><div className="form-heading"><div className="form-number green">02</div><div><span className="section-kicker">ESTRATÉGIA DE AMORTIZAÇÃO</span><h2>Defina a estratégia</h2><p>Escolha o aporte e o objetivo da amortização.</p></div></div><div className="strategy-options"><button className="strategy-option selected"><div className="strategy-radio"><Check size={13} /></div><div><strong>Amortização extraordinária</strong><span>Aplicar um aporte na parcela escolhida.</span></div><span className="option-tag">Disponível</span></button></div><div className="form-grid strategy-grid"><Field label="Valor do aporte" prefix="R$" value={extraValue} onChange={setExtraValue} /><Field label="Parcela do aporte" value={extraMonth} suffix="mês" onChange={setExtraMonth} /><Field label="Frequência" value="Único" /><Field label="Sistema" value={method === "sac" ? "SAC" : "Price"} /></div><div className="objective-block"><span className="field-label">Objetivo da amortização</span><div className="segmented"><button className={goal === "term" ? "selected" : ""} onClick={() => setGoal("term")}><TrendingDown size={16} />Reduzir prazo</button><button className={goal === "payment" ? "selected" : ""} onClick={() => setGoal("payment")}><ReceiptText size={16} />Reduzir parcela</button></div></div><div className="form-footer"><button className="back-button" onClick={() => setStep(1)}><ArrowLeft size={16} /> Voltar</button><button className="primary-button" onClick={() => { if (!projection) { setError("Revise os dados da amortização."); return; } void onGenerate({ name: propertyName.trim() || "Meu financiamento", financing, extraPayments, goal }); }}>Salvar e gerar simulação <Sparkles size={16} /></button></div></div><aside className="panel form-aside strategy-aside"><div className="strategy-preview"><span>IMPACTO PREVISTO</span><strong>{projection ? `- ${Math.max(0, financing.termMonths - projection.payoffMonth)} meses` : "—"}</strong><small>no prazo total</small></div><div className="mini-bars"><div><span>Sem aporte</span><i style={{ width: "92%" }} /></div><div><span>Com aporte</span><i style={{ width: projection && financing.termMonths > 0 ? `${Math.max(20, projection.payoffMonth / financing.termMonths * 92)}%` : "92%" }} /></div></div><p className="aside-note"><Info size={15} /> O resultado será calculado com os dados informados.</p></aside></div>}</section>;
 }
 function Result({ comparison, setScreen }: { comparison: SimulationComparison; setScreen: (screen: Screen) => void }) {
   const { baseline, scenario } = comparison;
@@ -252,10 +260,16 @@ function Scenarios({ comparison, simulation, setScreen }: { comparison: Simulati
   return <section className="scenarios-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />VISÃO DE CENÁRIOS</div><h1>Comparar estratégias</h1><p>Compare prazo, juros e esforço de aporte.</p></div><button className="outline-button" onClick={() => setScreen("simulation")}><Plus size={15} /> Novo cenário</button></section><div className="scenario-hero"><div><span className="section-kicker">CENÁRIO SELECIONADO</span><h2>Referência · {formatCurrency(rows[0].amount)}</h2><p>Use este cenário como referência para comparar outras estratégias.</p></div><div className="scenario-hero-result"><span>ECONOMIA EM JUROS</span><strong>{formatCurrency(comparison.interestSavings)}</strong><small>- {comparison.monthsReduced} meses no prazo</small></div></div><div className="scenario-table panel"><div className="scenario-table-heading"><div><span className="section-kicker">COMPARAÇÃO RÁPIDA</span><h2>Cenários comparados</h2></div><span className="filter-button">Ordenar: economia</span></div><div className="scenario-list"><div className="scenario-row header"><span>CENÁRIO</span><span>APORTE</span><span>PRAZO FINAL</span><span>JUROS TOTAIS</span><span>ECONOMIA</span><span /></div>{rows.map((row, index) => <div className={`scenario-row ${index === 0 ? "selected" : ""}`} key={row.name}><div className="scenario-name"><div className={`scenario-dot ${index === 0 ? "reference" : index === 1 ? "ambitious" : "calm"}`} /><div><strong>{row.name}</strong><small>{row.detail}</small></div></div><span>{formatCurrency(row.amount)}</span><span>{formatDate(row.result.payoffMonth)}</span><span>{formatCurrency(row.result.totalInterest)}</span><strong className={index === 2 ? "muted-value" : "green-value"}>{index === 2 ? "—" : formatCurrency(comparison.baseline.totalInterest - row.result.totalInterest)}</strong><button className="row-more"><MoreHorizontal size={17} /></button></div>)}</div></div><div className="scenario-bottom"><div className="panel scenario-chart-card"><div className="panel-heading compact"><div><span className="section-kicker">ESFORÇO × RESULTADO</span><h2>Aporte anual × economia de juros</h2></div><Info size={17} className="muted-icon" /></div><div className="scatter"><div className="scatter-axis-y"><span>{formatCurrency(comparison.baseline.totalInterest)}</span><span>{formatCurrency(comparison.interestSavings)}</span><span>R$ 0</span></div><div className="scatter-field"><div className="scatter-line" /><div className="scatter-point point-a"><span>Acelerar</span></div><div className="scatter-point point-b"><span>Referência</span></div><div className="scatter-point point-c"><span>Constante</span></div><div className="scatter-x"><span>R$ 0</span><span>{formatCurrency(rows[0].amount)}</span><span>{formatCurrency(rows[1].amount)}</span></div></div></div></div><div className="panel compare-cta"><div className="compare-icon"><Copy size={18} /></div><h3>Comparar dois cenários</h3><p>Coloque duas estratégias lado a lado.</p><button className="secondary-button full" onClick={() => setScreen("result")}>Abrir comparação <ArrowRight size={15} /></button></div></div></section>;
 }
 
+function History({ financings, onSelect, onNew }: { financings: FinancingSummary[]; onSelect: (id: string) => void; onNew: () => void }) {
+  return <section className="table-page"><section className="page-intro"><div><div className="eyebrow"><span className="eyebrow-line" />WORKSPACE</div><h1>Histórico de financiamentos</h1><p>Consulte os imóveis e simulações salvos nesta sessão.</p></div><button className="primary-button" onClick={onNew}><Plus size={16} /> Novo imóvel</button></section><div className="panel table-panel"><div className="table-caption"><div><span className="section-kicker">REGISTROS SALVOS</span><h2>{financings.length} financiamento{financings.length === 1 ? "" : "s"}</h2></div></div><div className="data-table-wrap"><table><thead><tr><th>IMÓVEL</th><th>SISTEMA</th><th>VALOR FINANCIADO</th><th>PRAZO</th><th>ATUALIZADO</th><th /></tr></thead><tbody>{financings.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td>{item.method === "sac" ? "SAC" : "Price"}</td><td>{formatCurrency(item.principal)}</td><td>{item.termMonths} meses</td><td>{new Date(item.updatedAt).toLocaleDateString("pt-BR")}</td><td><button className="text-button" onClick={() => onSelect(item.id)}>Abrir</button></td></tr>)}</tbody></table></div>{financings.length === 0 && <p className="empty-state">Nenhum financiamento salvo ainda.</p>}</div></section>;
+}
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [simulationStep, setSimulationStep] = useState<SimulationStep>(1);
   const [simulation, setSimulation] = useState<SimulationConfig>(initialSimulation);
+  const [financings, setFinancings] = useState<FinancingSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<string>();
   const [toast, setToast] = useState<string | null>(null);
   const comparison = comparisonFor(simulation);
 
@@ -263,23 +277,51 @@ export default function Home() {
     let active = true;
     fetch("/api/financings")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("API indisponível")))
-      .then((items: Array<{ id: string }>) => items[0] ? fetch(`/api/financings/${items[0].id}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Financiamento indisponível"))) : null)
+      .then((items: FinancingSummary[]) => {
+        if (!active) return null;
+        setFinancings(items);
+        if (!items[0]) return null;
+        setSelectedId(items[0].id);
+        return fetch(`/api/financings/${items[0].id}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Financiamento indisponível")));
+      })
       .then((saved: { id: string; principal: number; annualRate: number; termMonths: number; method: FinancingInput["method"]; amortizations?: Array<{ month: number; amount: number; goal: AmortizationGoal }> } | null) => {
         if (!active || !saved) return;
-        setSimulation({ financingId: saved.id, financing: { principal: saved.principal, annualRate: saved.annualRate, termMonths: saved.termMonths, method: saved.method }, extraPayments: saved.amortizations?.map(({ month, amount }) => ({ month, amount })) ?? [], goal: saved.amortizations?.[0]?.goal ?? "term" });
+        setSimulation({ financingId: saved.id, name: financings[0]?.name, financing: { principal: saved.principal, annualRate: saved.annualRate, termMonths: saved.termMonths, method: saved.method }, extraPayments: saved.amortizations?.map(({ month, amount }) => ({ month, amount })) ?? [], goal: saved.amortizations?.[0]?.goal ?? "term" });
       })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
 
+  const selectFinancing = async (id: string) => {
+    const response = await fetch(`/api/financings/${id}`);
+    if (!response.ok) { notify("Não foi possível carregar o financiamento."); return; }
+    const saved = await response.json() as { id: string; principal: number; annualRate: number; termMonths: number; method: FinancingInput["method"]; name: string; amortizations?: Array<{ month: number; amount: number; goal: AmortizationGoal }> };
+    setSelectedId(id);
+    setSimulation({ financingId: saved.id, name: saved.name, financing: { principal: saved.principal, annualRate: saved.annualRate, termMonths: saved.termMonths, method: saved.method }, extraPayments: saved.amortizations?.map(({ month, amount }) => ({ month, amount })) ?? [], goal: saved.amortizations?.[0]?.goal ?? "term" });
+    setScreen("dashboard");
+  };
+  const deleteSelectedFinancing = async (id: string) => {
+    const response = await fetch(`/api/financings/${id}`, { method: "DELETE" });
+    if (!response.ok) { notify("Não foi possível excluir o financiamento."); return; }
+    const remaining = financings.filter((item) => item.id !== id);
+    setFinancings(remaining);
+    if (selectedId === id) {
+      if (remaining[0]) await selectFinancing(remaining[0].id);
+      else { setSelectedId(undefined); setSimulation(initialSimulation); setScreen("dashboard"); }
+    }
+  };
+  const startNewFinancing = () => { setSimulation(initialSimulation); setSelectedId(undefined); setSimulationStep(1); setScreen("simulation"); };
   const goTo = (next: Screen) => { setScreen(next); if (next === "simulation") setSimulationStep(1); };
   const notify = (text: string) => { setToast(text); window.setTimeout(() => setToast(null), 3200); };
   const generateSimulation = async (next: SimulationConfig) => {
     try {
-      const response = await fetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", { method: next.financingId ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...next.financing, name: "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }) });
+      const response = await fetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", { method: next.financingId ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...next.financing, name: next.name ?? "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }) });
       if (!response.ok) throw new Error("Não foi possível salvar");
       const saved = await response.json() as { id: string };
       setSimulation({ ...next, financingId: saved.id });
+      setSelectedId(saved.id);
+      const listResponse = await fetch("/api/financings");
+      if (listResponse.ok) setFinancings(await listResponse.json() as FinancingSummary[]);
     } catch {
       setSimulation(next);
       notify("Simulação calculada localmente. O banco estará disponível quando o servidor estiver ativo.");
@@ -297,5 +339,5 @@ export default function Home() {
     setSimulation(next);
   };
 
-  return <AppShell screen={screen} setScreen={goTo} onToast={notify}>{screen === "dashboard" && <Dashboard setScreen={goTo} onToast={notify} />}{screen === "simulation" && <Simulation step={simulationStep} setStep={setSimulationStep} setScreen={goTo} onGenerate={generateSimulation} />}{screen === "result" && <Result comparison={comparison} setScreen={goTo} />}{screen === "table" && <AmortizationTable comparison={comparison} setScreen={goTo} onAddAmortization={addAmortization} />}{screen === "scenarios" && <Scenarios comparison={comparison} simulation={simulation} setScreen={goTo} />}{toast && <div className="toast"><div className="toast-check"><Check size={14} /></div><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Fechar mensagem"><X size={14} /></button></div>}</AppShell>;
+  return <AppShell screen={screen} setScreen={goTo} onToast={notify} financings={financings} selectedId={selectedId} onSelectFinancing={selectFinancing} onNewFinancing={startNewFinancing} onDeleteFinancing={deleteSelectedFinancing}>{screen === "dashboard" && <Dashboard setScreen={goTo} onToast={notify} />}{screen === "simulation" && <Simulation step={simulationStep} setStep={setSimulationStep} setScreen={goTo} onGenerate={generateSimulation} />}{screen === "result" && <Result comparison={comparison} setScreen={goTo} />}{screen === "table" && <AmortizationTable comparison={comparison} setScreen={goTo} onAddAmortization={addAmortization} />}{screen === "scenarios" && <Scenarios comparison={comparison} simulation={simulation} setScreen={goTo} />}{screen === "history" && <History financings={financings} onSelect={selectFinancing} onNew={startNewFinancing} />}{toast && <div className="toast"><div className="toast-check"><Check size={14} /></div><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Fechar mensagem"><X size={14} /></button></div>}</AppShell>;
 }

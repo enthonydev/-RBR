@@ -134,12 +134,12 @@ export function createFinancing(database: Database, userId: string, input: Finan
   return getFinancing(database, userId, id)!;
 }
 
-export function updateFinancing(database: Database, userId: string, id: string, input: FinancingInput, extraPayments: ExtraordinaryPayment[], goal: AmortizationGoal) {
+export function updateFinancing(database: Database, userId: string, id: string, input: FinancingInput, extraPayments: ExtraordinaryPayment[], goal: AmortizationGoal, name?: string) {
   if (!getFinancing(database, userId, id)) return null;
   const now = new Date().toISOString();
   database.exec("BEGIN");
   try {
-    database.prepare(`UPDATE financings SET principal = ?, annual_rate = ?, term_months = ?, method = ?, updated_at = ? WHERE id = ? AND user_id = ?`).run(input.principal, input.annualRate, input.termMonths, input.method, now, id, userId);
+    database.prepare(`UPDATE financings SET name = COALESCE(?, name), principal = ?, annual_rate = ?, term_months = ?, method = ?, updated_at = ? WHERE id = ? AND user_id = ?`).run(name?.trim() || null, input.principal, input.annualRate, input.termMonths, input.method, now, id, userId);
     database.prepare(`DELETE FROM amortizations WHERE financing_id = ?`).run(id);
     const insert = database.prepare(`INSERT INTO amortizations (id, financing_id, month, amount, goal, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
     for (const payment of extraPayments) insert.run(randomUUID(), id, payment.month, payment.amount, goal, now);
@@ -149,6 +149,11 @@ export function updateFinancing(database: Database, userId: string, id: string, 
     database.exec("ROLLBACK");
     throw error;
   }
+}
+
+export function deleteFinancing(database: Database, userId: string, id: string) {
+  const result = database.prepare(`DELETE FROM financings WHERE id = ? AND user_id = ?`).run(id, userId);
+  return result.changes > 0;
 }
 
 export function listFinancings(database: Database, userId: string) {

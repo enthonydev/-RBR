@@ -3,7 +3,7 @@ import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
 import { type AmortizationGoal, type AmortizationMethod, type ExtraordinaryPayment, type FinancingInput } from "@shared/finance";
-import { addAmortization, createFinancing, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization, updateFinancing } from "./db";
+import { addAmortization, createFinancing, deleteFinancing, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization, updateFinancing } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,7 +65,8 @@ async function startServer() {
       const goal = req.body.goal ?? "term";
       if (!isGoal(goal)) throw new Error("Objetivo de amortização inválido.");
       const amortizations = readAmortizations(req.body.extraPayments, goal);
-      const financing = updateFinancing(database, localUser.id, req.params.id, input, amortizations, goal);
+      const name = typeof req.body.name === "string" ? req.body.name : undefined;
+      const financing = updateFinancing(database, localUser.id, req.params.id, input, amortizations, goal, name);
       return financing ? res.json(financing) : res.status(404).json({ error: "Financiamento não encontrado." });
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível atualizar o financiamento." });
@@ -75,6 +76,10 @@ async function startServer() {
   app.get("/api/financings/:id", (req, res) => {
     const financing = getFinancingWithAmortizations(database, localUser.id, req.params.id);
     return financing ? res.json(financing) : res.status(404).json({ error: "Financiamento não encontrado." });
+  });
+
+  app.delete("/api/financings/:id", (req, res) => {
+    return deleteFinancing(database, localUser.id, req.params.id) ? res.status(204).send() : res.status(404).json({ error: "Financiamento não encontrado." });
   });
 
   app.post("/api/financings/:id/amortizations", (req, res) => {

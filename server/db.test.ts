@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { addAmortization, createFinancing, createUser, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization } from "./db";
+import { addAmortization, createFinancing, createUser, deleteFinancing, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization } from "./db";
 
 describe("financing database", () => {
   it("garante o usuário local de forma idempotente", () => {
@@ -47,6 +47,21 @@ describe("financing database", () => {
     expect(getFinancingWithAmortizations(database, other.id, financing.id)).toBeNull();
     expect(removeAmortization(database, other.id, financing.id, amortization.id)).toBe(false);
     expect(getFinancingWithAmortizations(database, owner.id, financing.id)?.amortizations).toHaveLength(1);
+
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  it("remove um financiamento e suas amortizações", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "rbr-"));
+    const database = openDatabase(path.join(directory, "test.sqlite"));
+    const user = ensureLocalUser(database);
+    const financing = createFinancing(database, user.id, { principal: 150000, annualRate: 9, termMonths: 180, method: "sac" });
+    addAmortization(database, user.id, financing.id, { month: 6, amount: 3000 }, "term");
+
+    expect(deleteFinancing(database, user.id, financing.id)).toBe(true);
+    expect(getFinancingWithAmortizations(database, user.id, financing.id)).toBeNull();
+    expect(listFinancings(database, user.id)).toEqual([]);
 
     database.close();
     rmSync(directory, { recursive: true, force: true });
