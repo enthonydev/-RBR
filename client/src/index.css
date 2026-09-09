@@ -197,3 +197,5 @@ body { background: #101416; color: #e8ece9; }
 .row-more, .pagination button { color: #9aa59f; }
 .row-more:hover, .pagination button:hover { color: #b9d2f2; }
 
+
+.input-wrap select { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; color: #e8eeeb; background: transparent; cursor: pointer; font: 500 12px 'DM Mono', monospace; }
