@@ -4,10 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import type { AmortizationGoal, AmortizationMethod, ExtraordinaryPayment, FinancingInput } from "@shared/finance";
 
-// RBR é uma ferramenta de uso pessoal (um financiamento, um dono). Em vez de
-// login/senha, todo dado fica associado a este id fixo, criado uma vez no
-// primeiro start. Isso mantém a separação de dados por dono no schema
-// (útil se um dia virar multiusuário) sem exigir tela de autenticação agora.
+// O usuário local permanece como fallback durante a migração para autenticação externa.
 const LOCAL_USER_ID = "local";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -188,4 +185,10 @@ export function removeAmortization(database: Database, userId: string, financing
   const result = database.prepare(`DELETE FROM amortizations WHERE id = ? AND financing_id = ?`).run(amortizationId, financingId);
   if (result.changes > 0) database.prepare(`UPDATE financings SET updated_at = ? WHERE id = ? AND user_id = ?`).run(new Date().toISOString(), financingId, userId);
   return result.changes > 0;
+}
+
+export function ensureFirebaseUser(database: Database, uid: string, email?: string, name?: string) {
+  const now = new Date().toISOString();
+  database.prepare(`INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET email = COALESCE(excluded.email, users.email), name = COALESCE(excluded.name, users.name)`).run(uid, email ?? `${uid}@firebase.local`, name ?? "Usuário RBR", now);
+  return database.prepare(`SELECT id, email, name, created_at as createdAt FROM users WHERE id = ?`).get(uid) as { id: string; email: string; name: string; createdAt: string };
 }

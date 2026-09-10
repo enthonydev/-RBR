@@ -20,6 +20,7 @@ A aplicação separa o motor financeiro determinístico da interface e da persis
 - Histórico de financiamentos salvos, seleção de imóvel e exclusão com confirmação.
 - Persistência local em SQLite por meio do `node:sqlite`.
 - Fallback para cálculo local quando a API de persistência não está disponível.
+- Base inicial de autenticação por Firebase preparada para cadastro, login e verificação de e-mail.
 - Testes automatizados do motor financeiro e da camada de persistência.
 - Pipeline de integração contínua com verificação de tipos, testes e build.
 
@@ -117,6 +118,10 @@ A API atual é voltada à persistência dos financiamentos. Os cálculos podem s
 | `DELETE` | `/api/financings/:id/amortizations/:amortizationId` | Remove uma amortização extraordinária. |
 
 A versão atual utiliza um usuário local fixo e não possui tela de login. O schema mantém a relação entre usuário, financiamento e amortizações para permitir evolução futura sem misturar os dados no banco.
+
+### Autenticação em transição
+
+O cliente já possui a base de configuração do Firebase e a tela `/auth`. Para ativar o fluxo, preencha as variáveis `VITE_FIREBASE_*` do `.env.example`. O servidor aceita tokens Firebase quando `FIREBASE_SERVICE_ACCOUNT_JSON` está configurada. Durante a transição, `AUTH_REQUIRED=false` mantém o modo local; esse modo não deve ser usado para uma publicação externa. A etapa seguinte é ativar a exigência de autenticação e concluir o isolamento por `uid` em ambiente de staging.
 
 ## Motor financeiro
 

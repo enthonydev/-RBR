@@ -36,6 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 import { compareFinancing, parseCurrency, simulateFinancing, type AmortizationGoal, type ExtraordinaryPayment, type FinancingInput, type SimulationComparison } from "@shared/finance";
+import { apiFetch } from "@/lib/api";
 
 type Screen = "dashboard" | "simulation" | "result" | "table" | "scenarios" | "history";
 type SimulationStep = 1 | 2;
@@ -267,14 +268,14 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/financings")
+    apiFetch("/api/financings")
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("API indisponível")))
       .then((items: FinancingSummary[]) => {
         if (!active) return null;
         setFinancings(items);
         if (!items[0]) return null;
         setSelectedId(items[0].id);
-        return fetch(`/api/financings/${items[0].id}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Financiamento indisponível")));
+        return apiFetch(`/api/financings/${items[0].id}`).then((response) => response.ok ? response.json() : Promise.reject(new Error("Financiamento indisponível")));
       })
       .then((saved: { id: string; principal: number; annualRate: number; termMonths: number; method: FinancingInput["method"]; amortizations?: Array<{ month: number; amount: number; goal: AmortizationGoal }> } | null) => {
         if (!active || !saved) return;
@@ -285,7 +286,7 @@ export default function Home() {
   }, []);
 
   const selectFinancing = async (id: string) => {
-    const response = await fetch(`/api/financings/${id}`);
+    const response = await apiFetch(`/api/financings/${id}`);
     if (!response.ok) { notify("Não foi possível carregar o financiamento."); return; }
     const saved = await response.json() as { id: string; principal: number; annualRate: number; termMonths: number; method: FinancingInput["method"]; name: string; amortizations?: Array<{ month: number; amount: number; goal: AmortizationGoal }> };
     setSelectedId(id);
@@ -293,7 +294,7 @@ export default function Home() {
     setScreen("dashboard");
   };
   const deleteSelectedFinancing = async (id: string) => {
-    const response = await fetch(`/api/financings/${id}`, { method: "DELETE" });
+    const response = await apiFetch(`/api/financings/${id}`, { method: "DELETE" });
     if (!response.ok) { notify("Não foi possível excluir o financiamento."); return; }
     const remaining = financings.filter((item) => item.id !== id);
     setFinancings(remaining);
@@ -307,12 +308,12 @@ export default function Home() {
   const notify = (text: string) => { setToast(text); window.setTimeout(() => setToast(null), 3200); };
   const generateSimulation = async (next: SimulationConfig) => {
     try {
-      const response = await fetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", { method: next.financingId ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...next.financing, name: next.name ?? "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }) });
+      const response = await apiFetch(next.financingId ? `/api/financings/${next.financingId}` : "/api/financings", { method: next.financingId ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...next.financing, name: next.name ?? "Meu financiamento", goal: next.goal, extraPayments: next.extraPayments }) });
       if (!response.ok) throw new Error("Não foi possível salvar");
       const saved = await response.json() as { id: string };
       setSimulation({ ...next, financingId: saved.id });
       setSelectedId(saved.id);
-      const listResponse = await fetch("/api/financings");
+      const listResponse = await apiFetch("/api/financings");
       if (listResponse.ok) setFinancings(await listResponse.json() as FinancingSummary[]);
     } catch {
       setSimulation(next);
@@ -325,7 +326,7 @@ export default function Home() {
     const next = { ...simulation, extraPayments: [...simulation.extraPayments, payment] };
     if (!simulation.financingId) { setSimulation(next); return; }
     try {
-      const response = await fetch(`/api/financings/${simulation.financingId}/amortizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payment, goal: simulation.goal }) });
+      const response = await apiFetch(`/api/financings/${simulation.financingId}/amortizations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payment, goal: simulation.goal }) });
       if (!response.ok) throw new Error("Não foi possível salvar");
     } catch { notify("A amortização foi aplicada nesta sessão, mas não foi persistida no banco."); }
     setSimulation(next);

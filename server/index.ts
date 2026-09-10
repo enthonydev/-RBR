@@ -2,8 +2,10 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import { fileURLToPath } from "url";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { type AmortizationGoal, type AmortizationMethod, type ExtraordinaryPayment, type FinancingInput } from "@shared/finance";
-import { addAmortization, createFinancing, deleteFinancing, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization, updateFinancing } from "./db";
+import { addAmortization, createFinancing, deleteFinancing, ensureFirebaseUser, ensureLocalUser, getFinancingWithAmortizations, listFinancings, openDatabase, removeAmortization, updateFinancing } from "./db";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,9 +42,29 @@ async function startServer() {
   const database = openDatabase();
   const localUser = ensureLocalUser(database);
   app.use(express.json());
+  const authRequired = process.env.AUTH_REQUIRED === "true";
+  const firebaseServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (firebaseServiceAccount && getApps().length === 0) initializeApp({ credential: cert(JSON.parse(firebaseServiceAccount)) });
+  app.use("/api", async (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization?.startsWith("Bearer ")) {
+      if (authRequired) return res.status(401).json({ error: "Autenticação necessária." });
+      res.locals.userId = localUser.id;
+      return next();
+    }
+    try {
+      if (!getApps().length) return res.status(503).json({ error: "Autenticação externa não configurada." });
+      const token = await getAuth().verifyIdToken(authorization.slice(7));
+      const user = ensureFirebaseUser(database, token.uid, token.email, token.name);
+      res.locals.userId = user.id;
+      return next();
+    } catch {
+      return res.status(401).json({ error: "Token de autenticação inválido." });
+    }
+  });
 
   app.get("/api/financings", (_req, res) => {
-    res.json(listFinancings(database, localUser.id));
+    res.json(listFinancings(database, res.locals.userId));
   });
 
   app.post("/api/financings", (req, res) => {
@@ -51,9 +73,9 @@ async function startServer() {
       const name = typeof req.body.name === "string" ? req.body.name : "Meu financiamento";
       const goal = req.body.goal ?? "term";
       if (!isGoal(goal)) throw new Error("Objetivo de amortização inválido.");
-      const financing = createFinancing(database, localUser.id, input, name);
+      const financing = createFinancing(database, res.locals.userId, input, name);
       const amortizations = readAmortizations(req.body.extraPayments ?? [], goal);
-      return res.status(201).json(updateFinancing(database, localUser.id, financing.id, input, amortizations, goal));
+      return res.status(201).json(updateFinancing(database, res.locals.userId, financing.id, input, amortizations, goal));
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível salvar o financiamento." });
     }
@@ -66,7 +88,7 @@ async function startServer() {
       if (!isGoal(goal)) throw new Error("Objetivo de amortização inválido.");
       const amortizations = readAmortizations(req.body.extraPayments, goal);
       const name = typeof req.body.name === "string" ? req.body.name : undefined;
-      const financing = updateFinancing(database, localUser.id, req.params.id, input, amortizations, goal, name);
+      const financing = updateFinancing(database, res.locals.userId, req.params.id, input, amortizations, goal, name);
       return financing ? res.json(financing) : res.status(404).json({ error: "Financiamento não encontrado." });
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível atualizar o financiamento." });
@@ -74,18 +96,18 @@ async function startServer() {
   });
 
   app.get("/api/financings/:id", (req, res) => {
-    const financing = getFinancingWithAmortizations(database, localUser.id, req.params.id);
+    const financing = getFinancingWithAmortizations(database, res.locals.userId, req.params.id);
     return financing ? res.json(financing) : res.status(404).json({ error: "Financiamento não encontrado." });
   });
 
   app.delete("/api/financings/:id", (req, res) => {
-    return deleteFinancing(database, localUser.id, req.params.id) ? res.status(204).send() : res.status(404).json({ error: "Financiamento não encontrado." });
+    return deleteFinancing(database, res.locals.userId, req.params.id) ? res.status(204).send() : res.status(404).json({ error: "Financiamento não encontrado." });
   });
 
   app.post("/api/financings/:id/amortizations", (req, res) => {
     try {
       const { payment, goal } = readAmortization(req.body as Record<string, unknown>);
-      const amortization = addAmortization(database, localUser.id, req.params.id, payment, goal);
+      const amortization = addAmortization(database, res.locals.userId, req.params.id, payment, goal);
       return amortization ? res.status(201).json(amortization) : res.status(404).json({ error: "Financiamento não encontrado." });
     } catch (error) {
       return res.status(400).json({ error: error instanceof Error ? error.message : "Não foi possível salvar a amortização." });
@@ -93,7 +115,7 @@ async function startServer() {
   });
 
   app.delete("/api/financings/:id/amortizations/:amortizationId", (req, res) => {
-    const removed = removeAmortization(database, localUser.id, req.params.id, req.params.amortizationId);
+    const removed = removeAmortization(database, res.locals.userId, req.params.id, req.params.amortizationId);
     return removed ? res.status(204).send() : res.status(404).json({ error: "Amortização não encontrada." });
   });
 
