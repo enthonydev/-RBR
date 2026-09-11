@@ -61,7 +61,7 @@ O motor financeiro está em `shared/finance.ts`. A interface principal está em 
 ## Instalação
 
 ```bash
-git clone https://github.com/enthonydev/-RBR.git
+git clone https://github.com/enthonydev/REAL-BALANCE-ROOM-rbr..git
 cd -RBR
 pnpm install
 ```
