@@ -15,3 +15,7 @@ Inclua uma descrição objetiva, o impacto observado, os passos mínimos para re
 - Validar entradas recebidas pela API antes de persistir dados.
 - Manter dependências e lockfile atualizados de forma controlada.
 - Não tratar diferenças financeiras como fraude ou ilegalidade sem análise especializada.
+
+## Dependências
+
+O CI e as revisões locais devem executar `pnpm audit --prod`. A base atual não possui vulnerabilidades críticas ou altas após a atualização das dependências. Permanece um alerta moderado transitivo de `uuid@9` trazido pelo Firebase Admin por uma cadeia do Google Cloud; o caminho usado pelo RBR valida tokens e não utiliza as APIs de UUID vulneráveis. A dependência deve ser reavaliada quando o fornecedor publicar a atualização compatível.
